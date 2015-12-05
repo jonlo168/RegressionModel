@@ -1,0 +1,151 @@
+---
+title: "Regression Model Course Project : Motor Trend"
+author: "Jonathan Lok-Chuen Lo"
+date: "November 21, 2015"
+output: pdf_document
+geometry: margin=1in
+---
+
+```{r set_options, echo=FALSE}
+knitr::opts_chunk$set(
+    echo = TRUE, 
+    warning = FALSE, 
+    message = FALSE,
+    fig.path = "figure/",
+    fig.height = 4,
+    fig.width = 6,
+    fig.pos = "center")
+```
+
+## Executive Summary
+
+This report aims to explore the relationship between a set of variables and 
+miles per gallon (MPG). In particular, we are interested in: 1) Is an automatic 
+or manual transmission better for MPG: 2) Quantify the MPG difference between 
+automatic and manual transmissions. Data used in the analysis was based on the 
+*mtcars* dataset which was extracted from the 1974 Motor Trend US magazine for
+32 automobiles (1973-74 models).
+
+Regression of MPG against only transmission types shows that manual transmission
+is 7.245 MPG better than automatic transmission. However, by including weight
+and 1/4 mile time, the result becomes inconclusive. It is found that the dataset
+contains more manual transmission cars of smaller size and lower engine power,
+which could skew the analysis (i.e. the apparent better MPG of manual
+transimission could be due to other factors such as weight and engine power).
+
+## Explorary Data Analysis
+
+Load the *mtcars* dataset and the required libraries. Transmission is converted
+into a factor variable. Box-plot of MPG vs transmission is shown in Appendix A. 
+
+```{r load_data}
+library(ggplot2); library(dplyr); library(datasets)
+data(mtcars)
+mtcars$am = factor(mtcars$am, c(0, 1), labels = c("Automatic", "Manual"))
+```
+
+In the first glance, manual transmission seems to be more efficient in terms of
+MPG. However, MPG is highly dependent on other factors such as engine power and
+weight. Appendix B and C shows MPG vs number of cylinders and weight
+respectively, between automatic and manual transmission. It shows the dataset
+contains a larger number of smaller manual transmission cars.
+
+## Model Selection
+
+MPG is dependent on many other factors. Two important factors are the car weight
+and engine power. For engine power, 1/4 mile time, displacement and
+horsepower are all good indicators. To avoid including unnecessary variables, a
+nested model testing is performed.
+
+```{r model_selection}
+fit1 <- lm(mpg ~ am, data = mtcars) 
+fit2 <- update(fit1, mpg ~ am * (qsec + wt)) 
+fit3 <- update(fit1, mpg ~ am * (qsec + wt + hp + disp))
+anova(fit1, fit2, fit3)
+```
+
+From the ANOVA above, using 1/4 mile time and weight as regressors reduce the 
+residual sum of squares (RSS) and the result is significant. Including 
+horsepower and displacement only improves the RSS marginally. Hence, the 
+regression model is chosen to use transmission , 1/4 mile time and weight.
+
+## Regression Model
+
+First, we run a regression model between MPG and transmission types only.
+
+```{r model_fit}
+fitSameSlope <- lm(mpg ~ am, data = mtcars)
+summary(fitSameSlope)$coef
+```
+
+Results above shows that the average MPG for manual transmission is 
+`r round(fitSameSlope$coef[2], 3)` MPG higher as
+compared to automatic transmissions of average 
+`r round(fitSameSlope$coef[1], 3)` MPG.
+
+However, as discussed earlier, the dataset contains more data for manual 
+transmission cars having smaller weight with less engine power, as compared to
+automatic transmission. A regression with adjustment using weight and 1/4 mile
+time is used.
+
+```{r model_fit2}
+fitDifferentSlope <- lm(mpg ~ am * (wt + qsec), data = mtcars)
+summary(fitDifferentSlope)$coef
+```
+
+Above shows that although the average MPG for manual transmission is still
+higher, it is no longer statically significant. In addition, the slope of weight
+against MPG is significant larger for manual transmission, or slope is 
+`r round(fitDifferentSlope$coef[5], 3)` MPG per 0.001lb from that of automatic 
+transmission. This suggests that weight of cars might have different impacts on 
+MPG as weight increases. 
+
+A residual plot is shown in Appendix D. The fitted values against residual does
+not contain any obvious pattern. However, the Q-Q plot seems to suggest the
+data might not be normal, which seems to coincide our observations that 
+dependency of MPG against weight is skewed.
+
+## Conclusion
+
+In summary, the dataset does not provide an conclusive answer to whether 
+automatic or manual transmission is better for MPG. This is because the dataset 
+contains more manual transmission cars of small size and lower engine power. To
+properly answer the question, additional randomized data is required.
+
+## Appendix A - Plot of MPG vs Transmission
+
+```{r echo = FALSE}
+g <- ggplot(mtcars, aes(am, mpg, fill = am))
+g <- g + geom_boxplot()
+g <- g + labs(x = "Transmission", y = "Miles per Gallon (MPG)")
+g
+```
+
+## Appendix B - Plot of MPG vs Number of Cylinders for Different Transmission
+
+```{r echo = FALSE}
+g <- ggplot(mtcars, aes(factor(cyl), mpg, fill = am))
+g <- g + geom_boxplot()
+g <- g + labs(x = "Number of Cylinder", y = "Miles per Gallon (MPG)")
+g <- g + scale_fill_discrete(name = "Transmission")
+g
+```
+
+## Appendix C - Plot of MPG vs Weight for Different Transmission
+
+```{r echo = FALSE}
+g <- ggplot(mtcars, aes(wt, mpg))
+g <- g + geom_point(aes(color = am))
+g <- g + labs(x = "Weight (lb/1000)", y = "Miles per Gallon (MPG)")
+g <- g + scale_fill_discrete(name = "Transmission")
+g
+```
+
+## Appendix D - Residual Plot of the Proposed Regression Model
+
+```{r echo = FALSE, fig.height = 6}
+par(mfrow = c(2, 2))
+plot(fitDifferentSlope)
+```
+
+
